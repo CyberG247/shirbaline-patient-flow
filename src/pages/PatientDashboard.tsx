@@ -22,6 +22,7 @@ import {
   Activity,
   Printer,
 } from "lucide-react";
+import PrintablePatientCard from "@/components/print/PrintablePatientCard";
 
 // Mock patient data
 const mockPatient = {
@@ -175,10 +176,24 @@ export default function PatientDashboard() {
               <p className={`text-2xl font-bold ${mockPatient.walletBalance < 5000 ? 'text-alert' : 'text-success'}`}>
                 ₦{mockPatient.walletBalance.toLocaleString()}
               </p>
-              <Button size="sm" variant="hero" className="mt-3 w-full">
-                <Plus className="h-4 w-4 mr-1" />
-                Add Funds
-              </Button>
+              <div className="flex gap-2 mt-3">
+                <Button size="sm" variant="hero" className="flex-1">
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Funds
+                </Button>
+                <PrintablePatientCard
+                  patient={{
+                    id: mockPatient.id,
+                    name: `${mockPatient.firstName} ${mockPatient.lastName}`,
+                    phone: mockPatient.phone,
+                    address: mockPatient.address,
+                    dateOfBirth: mockPatient.dateOfBirth,
+                    bloodGroup: mockPatient.bloodGroup,
+                    registrationDate: mockPatient.registrationDate,
+                  }}
+                  trigger={<Button size="sm" variant="outline"><Printer className="h-4 w-4" /></Button>}
+                />
+              </div>
             </div>
           </div>
 
