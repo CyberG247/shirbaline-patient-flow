@@ -21,8 +21,9 @@ import {
   AlertCircle,
   Wallet,
   CheckCircle2,
-  Printer,
 } from "lucide-react";
+import PrintablePatientCard from "@/components/print/PrintablePatientCard";
+import PrintableRegistrationSlip from "@/components/print/PrintableRegistrationSlip";
 
 export default function RegisterPatient() {
   const { toast } = useToast();
@@ -72,15 +73,28 @@ export default function RegisterPatient() {
     });
   };
 
-  const handlePrintSlip = () => {
-    // In production, this would trigger actual printing
-    toast({
-      title: "Print Job Sent",
-      description: "Registration slip sent to printer",
-    });
-  };
 
   if (registrationComplete) {
+    const patientCardData = {
+      id: patientId,
+      name: `${formData.firstName} ${formData.lastName}`,
+      phone: formData.phone,
+      address: formData.address,
+      dateOfBirth: formData.dateOfBirth,
+      bloodGroup: formData.bloodGroup,
+      registrationDate: new Date().toLocaleDateString("en-NG"),
+    };
+
+    const registrationSlipData = {
+      id: patientId,
+      name: `${formData.firstName} ${formData.lastName}`,
+      phone: formData.phone,
+      address: formData.address,
+      registrationDate: new Date().toLocaleDateString("en-NG"),
+      enrollmentFeePaid: 2000,
+      walletBalance: parseInt(formData.initialDeposit),
+    };
+
     return (
       <MainLayout>
         <div className="p-6 lg:p-8 max-w-2xl mx-auto">
@@ -97,7 +111,7 @@ export default function RegisterPatient() {
               Patient has been successfully registered in the system.
             </p>
 
-            {/* Registration Slip Preview */}
+            {/* Registration Summary */}
             <div className="bg-secondary rounded-xl p-6 text-left mb-6 border-2 border-dashed border-border">
               <div className="text-center mb-4 pb-4 border-b border-border">
                 <h2 className="text-lg font-bold text-primary">SHIRBALINE HOSPITAL</h2>
@@ -144,39 +158,42 @@ export default function RegisterPatient() {
               </div>
             </div>
 
-            <div className="flex gap-4 justify-center">
-              <Button onClick={handlePrintSlip} variant="outline" size="lg">
-                <Printer className="h-4 w-4 mr-2" />
-                Print Slip
-              </Button>
-              <Button
-                onClick={() => {
-                  setRegistrationComplete(false);
-                  setFormData({
-                    firstName: "",
-                    lastName: "",
-                    dateOfBirth: "",
-                    gender: "",
-                    phone: "",
-                    alternatePhone: "",
-                    address: "",
-                    state: "Jigawa",
-                    lga: "",
-                    emergencyContactName: "",
-                    emergencyContactPhone: "",
-                    bloodGroup: "",
-                    allergies: "",
-                    presentingComplaint: "",
-                    initialDeposit: "5000",
-                  });
-                }}
-                variant="hero"
-                size="lg"
-              >
-                <UserPlus className="h-4 w-4 mr-2" />
-                Register Another
-              </Button>
+            {/* Print Options */}
+            <div className="flex flex-wrap gap-3 justify-center mb-6">
+              <PrintablePatientCard patient={patientCardData} />
+              <PrintableRegistrationSlip
+                patient={registrationSlipData}
+                receiptNumber={`RCP-${Date.now().toString().slice(-8)}`}
+              />
             </div>
+
+            <Button
+              onClick={() => {
+                setRegistrationComplete(false);
+                setFormData({
+                  firstName: "",
+                  lastName: "",
+                  dateOfBirth: "",
+                  gender: "",
+                  phone: "",
+                  alternatePhone: "",
+                  address: "",
+                  state: "Jigawa",
+                  lga: "",
+                  emergencyContactName: "",
+                  emergencyContactPhone: "",
+                  bloodGroup: "",
+                  allergies: "",
+                  presentingComplaint: "",
+                  initialDeposit: "5000",
+                });
+              }}
+              variant="hero"
+              size="lg"
+            >
+              <UserPlus className="h-4 w-4 mr-2" />
+              Register Another Patient
+            </Button>
           </div>
         </div>
       </MainLayout>
