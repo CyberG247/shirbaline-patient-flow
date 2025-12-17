@@ -15,6 +15,7 @@ import {
   X,
   Activity,
   Building2,
+  BarChart3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,7 @@ const navigation = [
   { name: "Laboratory", href: "/laboratory", icon: FlaskConical },
   { name: "Pharmacy", href: "/pharmacy", icon: Pill },
   { name: "Billing", href: "/billing", icon: CreditCard },
+  { name: "Reports", href: "/reports", icon: BarChart3 },
 ];
 
 const secondaryNavigation = [
