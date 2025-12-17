@@ -47,9 +47,9 @@ export function QuickActions() {
               <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${action.variant === 'hero' ? 'bg-primary-foreground/20' : 'bg-primary/10'}`}>
                 <action.icon className={`h-5 w-5 ${action.variant === 'hero' ? 'text-primary-foreground' : 'text-primary'}`} />
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium">{action.title}</p>
-                <p className={`text-xs mt-0.5 ${action.variant === 'hero' ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
+              <div className="flex-1 min-w-0 overflow-hidden">
+                <p className="font-medium truncate">{action.title}</p>
+                <p className={`text-xs mt-0.5 truncate ${action.variant === 'hero' ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
                   {action.description}
                 </p>
               </div>

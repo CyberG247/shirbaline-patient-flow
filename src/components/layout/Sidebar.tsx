@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   UserPlus,
@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -38,7 +39,15 @@ const secondaryNavigation = [
 
 export function Sidebar() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+    setIsMobileOpen(false);
+  };
 
   return (
     <>
@@ -144,7 +153,10 @@ export function Sidebar() {
 
           {/* Logout */}
           <div className="px-4 py-4 border-t border-sidebar-border">
-            <button className="sidebar-link w-full text-sidebar-foreground/60 hover:text-alert">
+            <button 
+              onClick={handleLogout}
+              className="sidebar-link w-full text-sidebar-foreground/60 hover:text-alert"
+            >
               <LogOut className="h-5 w-5" />
               <span>Logout</span>
             </button>
