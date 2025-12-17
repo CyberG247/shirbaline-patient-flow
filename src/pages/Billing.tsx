@@ -3,6 +3,7 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -39,13 +40,26 @@ import {
   Printer,
   FileText,
   Calendar,
-  Filter,
   ArrowUpRight,
   ArrowDownRight,
+  Plus,
+  Trash2,
+  Loader2,
+  CreditCard,
+  FileSpreadsheet,
+  FileType,
+  ChevronDown,
 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 // Mock data
-const invoices = [
+const initialInvoices = [
   {
     id: "INV-2024-001",
     patientId: "SH-2024-0001",
@@ -95,7 +109,7 @@ const invoices = [
   },
 ];
 
-const transactions = [
+const initialTransactions = [
   { id: "TXN001", date: "2024-01-15 10:30", type: "deposit", patient: "Amina Mohammed", amount: 15000, method: "Cash", reference: "DEP-001" },
   { id: "TXN002", date: "2024-01-15 11:15", type: "debit", patient: "Amina Mohammed", amount: 5000, method: "Wallet", reference: "INV-2024-001" },
   { id: "TXN003", date: "2024-01-15 14:00", type: "deposit", patient: "Bello Abdullahi", amount: 10000, method: "Transfer", reference: "DEP-002" },
@@ -103,14 +117,369 @@ const transactions = [
   { id: "TXN005", date: "2024-01-14 09:00", type: "deposit", patient: "Hauwa Sani", amount: 5000, method: "Cash", reference: "DEP-003" },
 ];
 
+// Service items for quick selection
+const serviceItems = [
+  { id: 1, name: "Registration Fee", price: 2000 },
+  { id: 2, name: "Consultation Fee", price: 5000 },
+  { id: 3, name: "Emergency Consultation", price: 8000 },
+  { id: 4, name: "Follow-up Consultation", price: 3000 },
+  { id: 5, name: "Lab Test - Blood Count", price: 3500 },
+  { id: 6, name: "Lab Test - Urinalysis", price: 2000 },
+  { id: 7, name: "Lab Test - Malaria", price: 2000 },
+  { id: 8, name: "X-Ray", price: 6000 },
+  { id: 9, name: "Ultrasound", price: 8000 },
+  { id: 10, name: "ECG", price: 5000 },
+];
+
 const Billing = () => {
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("invoices");
   const [dateFilter, setDateFilter] = useState("today");
+  const [invoices, setInvoices] = useState(initialInvoices);
+  const [transactions, setTransactions] = useState(initialTransactions);
+
+  // Dialog states
+  const [isNewInvoiceOpen, setIsNewInvoiceOpen] = useState(false);
+  const [isCreatingInvoice, setIsCreatingInvoice] = useState(false);
+  const [isRecordingPayment, setIsRecordingPayment] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportFormat, setExportFormat] = useState<string | null>(null);
+
+  // Invoice form state
+  const [invoiceForm, setInvoiceForm] = useState({
+    patientId: "",
+    patientName: "",
+    items: [] as { description: string; amount: number }[],
+    newItemDescription: "",
+    newItemAmount: "",
+  });
 
   const totalRevenue = invoices.reduce((acc, inv) => acc + inv.paid, 0);
   const pendingAmount = invoices.reduce((acc, inv) => acc + (inv.total - inv.paid), 0);
   const overdueCount = invoices.filter(inv => inv.status === "overdue").length;
+
+  const getInvoiceTotal = () => {
+    return invoiceForm.items.reduce((sum, item) => sum + item.amount, 0);
+  };
+
+  const resetInvoiceForm = () => {
+    setInvoiceForm({
+      patientId: "",
+      patientName: "",
+      items: [],
+      newItemDescription: "",
+      newItemAmount: "",
+    });
+  };
+
+  const handleAddItem = () => {
+    if (!invoiceForm.newItemDescription || !invoiceForm.newItemAmount) return;
+    
+    setInvoiceForm(prev => ({
+      ...prev,
+      items: [...prev.items, { 
+        description: prev.newItemDescription, 
+        amount: parseInt(prev.newItemAmount) 
+      }],
+      newItemDescription: "",
+      newItemAmount: "",
+    }));
+  };
+
+  const handleAddQuickItem = (item: { name: string; price: number }) => {
+    setInvoiceForm(prev => ({
+      ...prev,
+      items: [...prev.items, { description: item.name, amount: item.price }],
+    }));
+  };
+
+  const handleRemoveItem = (index: number) => {
+    setInvoiceForm(prev => ({
+      ...prev,
+      items: prev.items.filter((_, i) => i !== index),
+    }));
+  };
+
+  const handleCreateInvoice = async () => {
+    if (!invoiceForm.patientId || !invoiceForm.patientName || invoiceForm.items.length === 0) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in patient details and add at least one item.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsCreatingInvoice(true);
+    
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    const newInvoice = {
+      id: `INV-2024-${String(invoices.length + 1).padStart(3, "0")}`,
+      patientId: invoiceForm.patientId,
+      patientName: invoiceForm.patientName,
+      date: new Date().toISOString().split("T")[0],
+      dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+      status: "pending",
+      items: invoiceForm.items,
+      total: getInvoiceTotal(),
+      paid: 0,
+      walletDeduction: false,
+    };
+
+    setInvoices([newInvoice, ...invoices]);
+    setIsCreatingInvoice(false);
+    setIsNewInvoiceOpen(false);
+    resetInvoiceForm();
+
+    toast({
+      title: "Invoice Created",
+      description: `Invoice ${newInvoice.id} has been generated for ${newInvoice.patientName}.`,
+    });
+  };
+
+  const handleRecordPayment = async (invoiceId: string, invoice: typeof invoices[0]) => {
+    setIsRecordingPayment(invoiceId);
+    
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    const amountDue = invoice.total - invoice.paid;
+    
+    // Update invoice
+    setInvoices(invoices.map(inv => 
+      inv.id === invoiceId 
+        ? { ...inv, status: "paid", paid: inv.total, walletDeduction: true }
+        : inv
+    ));
+
+    // Add transaction
+    const newTransaction = {
+      id: `TXN${String(transactions.length + 1).padStart(3, "0")}`,
+      date: new Date().toLocaleString("en-US", { 
+        year: "numeric", month: "2-digit", day: "2-digit",
+        hour: "2-digit", minute: "2-digit"
+      }),
+      type: "debit" as const,
+      patient: invoice.patientName,
+      amount: amountDue,
+      method: "Wallet",
+      reference: invoiceId,
+    };
+    setTransactions([newTransaction, ...transactions]);
+    
+    setIsRecordingPayment(null);
+
+    toast({
+      title: "Payment Recorded",
+      description: `₦${amountDue.toLocaleString()} has been deducted from patient's wallet.`,
+    });
+  };
+
+  const handleExportCSV = async () => {
+    setIsExporting(true);
+    setExportFormat("csv");
+    
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Generate CSV content
+    const headers = ["Invoice #", "Patient", "Patient ID", "Date", "Total", "Paid", "Balance", "Status"];
+    const rows = invoices.map(inv => [
+      inv.id,
+      inv.patientName,
+      inv.patientId,
+      inv.date,
+      inv.total,
+      inv.paid,
+      inv.total - inv.paid,
+      inv.status
+    ]);
+    
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(row => row.join(","))
+    ].join("\n");
+    
+    // Create and download file
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `billing_report_${new Date().toISOString().split("T")[0]}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    setIsExporting(false);
+    setExportFormat(null);
+
+    toast({
+      title: "CSV Exported",
+      description: `Exported ${invoices.length} invoices to CSV file.`,
+    });
+  };
+
+  const handleExportPDF = async () => {
+    setIsExporting(true);
+    setExportFormat("pdf");
+    
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    // Create PDF content using browser print
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Billing Report - Shirbaline Hospital</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; }
+          h1 { color: #0d9488; font-size: 24px; }
+          h2 { color: #333; font-size: 18px; margin-top: 20px; }
+          table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+          th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+          th { background-color: #f5f5f5; }
+          .header { display: flex; justify-content: space-between; border-bottom: 2px solid #0d9488; padding-bottom: 10px; }
+          .summary { background: #f0fdfa; padding: 15px; border-radius: 8px; margin: 15px 0; }
+          .paid { color: #10b981; }
+          .pending { color: #f59e0b; }
+          .overdue { color: #ef4444; }
+          .footer { margin-top: 30px; font-size: 12px; color: #666; text-align: center; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div>
+            <h1>Shirbaline Hospital</h1>
+            <p>Billing Report</p>
+          </div>
+          <div style="text-align: right;">
+            <p>Generated: ${new Date().toLocaleDateString()}</p>
+            <p>Dutse, Jigawa State, Nigeria</p>
+          </div>
+        </div>
+        
+        <div class="summary">
+          <h2>Summary</h2>
+          <p><strong>Total Revenue:</strong> ₦${totalRevenue.toLocaleString()}</p>
+          <p><strong>Pending Payments:</strong> ₦${pendingAmount.toLocaleString()}</p>
+          <p><strong>Total Invoices:</strong> ${invoices.length}</p>
+          <p><strong>Overdue:</strong> ${overdueCount}</p>
+        </div>
+        
+        <h2>Invoice Details</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Invoice #</th>
+              <th>Patient</th>
+              <th>Date</th>
+              <th>Total</th>
+              <th>Paid</th>
+              <th>Balance</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${invoices.map(inv => `
+              <tr>
+                <td>${inv.id}</td>
+                <td>${inv.patientName}<br/><small>${inv.patientId}</small></td>
+                <td>${inv.date}</td>
+                <td>₦${inv.total.toLocaleString()}</td>
+                <td class="paid">₦${inv.paid.toLocaleString()}</td>
+                <td class="${inv.total - inv.paid > 0 ? 'overdue' : ''}">₦${(inv.total - inv.paid).toLocaleString()}</td>
+                <td class="${inv.status}">${inv.status.charAt(0).toUpperCase() + inv.status.slice(1)}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+        
+        <div class="footer">
+          <p>This report was automatically generated by Shirbaline Hospital Management System</p>
+          <p>© ${new Date().getFullYear()} Shirbaline Hospital. All rights reserved.</p>
+        </div>
+      </body>
+      </html>
+    `;
+    
+    // Open print dialog for PDF
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.focus();
+      setTimeout(() => {
+        printWindow.print();
+      }, 250);
+    }
+    
+    setIsExporting(false);
+    setExportFormat(null);
+
+    toast({
+      title: "PDF Generated",
+      description: "Print dialog opened. Save as PDF to download.",
+    });
+  };
+
+  const handleExportExcel = async () => {
+    setIsExporting(true);
+    setExportFormat("excel");
+    
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Generate Excel-compatible CSV with special formatting
+    const headers = ["Invoice #", "Patient", "Patient ID", "Date", "Due Date", "Total (₦)", "Paid (₦)", "Balance (₦)", "Status"];
+    const rows = invoices.map(inv => [
+      inv.id,
+      inv.patientName,
+      inv.patientId,
+      inv.date,
+      inv.dueDate,
+      inv.total,
+      inv.paid,
+      inv.total - inv.paid,
+      inv.status
+    ]);
+    
+    // Add summary row
+    const summaryRows = [
+      [],
+      ["SUMMARY"],
+      ["Total Revenue", "", "", "", "", "", totalRevenue],
+      ["Pending Amount", "", "", "", "", "", "", pendingAmount],
+      ["Total Invoices", invoices.length],
+      ["Overdue Count", overdueCount],
+    ];
+    
+    const csvContent = [
+      headers.join("\t"),
+      ...rows.map(row => row.join("\t")),
+      ...summaryRows.map(row => row.join("\t"))
+    ].join("\n");
+    
+    // Create and download file with .xls extension for Excel
+    const blob = new Blob([csvContent], { type: "application/vnd.ms-excel" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `billing_report_${new Date().toISOString().split("T")[0]}.xls`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    setIsExporting(false);
+    setExportFormat(null);
+
+    toast({
+      title: "Excel Exported",
+      description: `Exported ${invoices.length} invoices to Excel file.`,
+    });
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -127,22 +496,181 @@ const Billing = () => {
 
   return (
     <MainLayout>
-      <div className="space-y-6 animate-fade-in">
+      <div className="p-6 lg:p-8 space-y-6 animate-fade-in">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Billing & Accounts</h1>
-            <p className="text-muted-foreground">Invoice management, payments, and financial reports</p>
+            <h1 className="text-2xl lg:text-3xl font-bold text-foreground flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl gradient-primary flex items-center justify-center">
+                <CreditCard className="h-5 w-5 text-primary-foreground" />
+              </div>
+              Billing & Accounts
+            </h1>
+            <p className="text-muted-foreground mt-2">Invoice management, payments, and financial reports</p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" className="gap-2">
-              <Download className="h-4 w-4" />
-              Export Report
-            </Button>
-            <Button className="gap-2">
-              <Receipt className="h-4 w-4" />
-              New Invoice
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  className="gap-2"
+                  disabled={isExporting}
+                >
+                  {isExporting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4" />
+                  )}
+                  {isExporting ? `Exporting ${exportFormat?.toUpperCase()}...` : "Export Report"}
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleExportCSV} className="gap-2 cursor-pointer">
+                  <FileSpreadsheet className="h-4 w-4" />
+                  Export as CSV
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportExcel} className="gap-2 cursor-pointer">
+                  <FileSpreadsheet className="h-4 w-4 text-success" />
+                  Export as Excel
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportPDF} className="gap-2 cursor-pointer">
+                  <FileType className="h-4 w-4 text-destructive" />
+                  Export as PDF
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Dialog open={isNewInvoiceOpen} onOpenChange={setIsNewInvoiceOpen}>
+              <DialogTrigger asChild>
+                <Button variant="hero" className="gap-2">
+                  <Receipt className="h-4 w-4" />
+                  New Invoice
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Generate New Invoice</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-6">
+                  {/* Patient Info */}
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="patientId">Patient ID *</Label>
+                      <Input
+                        id="patientId"
+                        value={invoiceForm.patientId}
+                        onChange={(e) => setInvoiceForm({ ...invoiceForm, patientId: e.target.value })}
+                        placeholder="e.g., SH-2024-0001"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="patientName">Patient Name *</Label>
+                      <Input
+                        id="patientName"
+                        value={invoiceForm.patientName}
+                        onChange={(e) => setInvoiceForm({ ...invoiceForm, patientName: e.target.value })}
+                        placeholder="Full name"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Quick Add Services */}
+                  <div className="space-y-3">
+                    <Label>Quick Add Services</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {serviceItems.slice(0, 6).map(item => (
+                        <Button
+                          key={item.id}
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleAddQuickItem(item)}
+                          className="text-xs"
+                        >
+                          {item.name} (₦{item.price.toLocaleString()})
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Custom Item Entry */}
+                  <div className="space-y-3">
+                    <Label>Add Custom Item</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Description"
+                        value={invoiceForm.newItemDescription}
+                        onChange={(e) => setInvoiceForm({ ...invoiceForm, newItemDescription: e.target.value })}
+                        className="flex-1"
+                      />
+                      <Input
+                        placeholder="Amount"
+                        type="number"
+                        value={invoiceForm.newItemAmount}
+                        onChange={(e) => setInvoiceForm({ ...invoiceForm, newItemAmount: e.target.value })}
+                        className="w-32"
+                      />
+                      <Button variant="outline" onClick={handleAddItem}>
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Invoice Items */}
+                  {invoiceForm.items.length > 0 && (
+                    <div className="space-y-3">
+                      <Label>Invoice Items</Label>
+                      <div className="border rounded-lg divide-y">
+                        {invoiceForm.items.map((item, idx) => (
+                          <div key={idx} className="flex items-center justify-between p-3">
+                            <span>{item.description}</span>
+                            <div className="flex items-center gap-3">
+                              <span className="font-medium">₦{item.amount.toLocaleString()}</span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRemoveItem(idx)}
+                                className="text-destructive hover:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Total */}
+                  {invoiceForm.items.length > 0 && (
+                    <div className="bg-secondary rounded-lg p-4">
+                      <div className="flex justify-between items-center">
+                        <span className="font-medium">Total Amount</span>
+                        <span className="text-2xl font-bold text-primary">₦{getInvoiceTotal().toLocaleString()}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <Button 
+                    className="w-full gap-2" 
+                    variant="hero"
+                    onClick={handleCreateInvoice}
+                    disabled={isCreatingInvoice}
+                  >
+                    {isCreatingInvoice ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Generating Invoice...
+                      </>
+                    ) : (
+                      <>
+                        <Receipt className="h-4 w-4" />
+                        Generate Invoice
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
 
@@ -351,9 +879,22 @@ const Billing = () => {
                                     Print
                                   </Button>
                                   {invoice.total - invoice.paid > 0 && (
-                                    <Button className="flex-1 gap-2">
-                                      <DollarSign className="h-4 w-4" />
-                                      Record Payment
+                                    <Button 
+                                      className="flex-1 gap-2"
+                                      onClick={() => handleRecordPayment(invoice.id, invoice)}
+                                      disabled={isRecordingPayment === invoice.id}
+                                    >
+                                      {isRecordingPayment === invoice.id ? (
+                                        <>
+                                          <Loader2 className="h-4 w-4 animate-spin" />
+                                          Processing...
+                                        </>
+                                      ) : (
+                                        <>
+                                          <DollarSign className="h-4 w-4" />
+                                          Record Payment
+                                        </>
+                                      )}
                                     </Button>
                                   )}
                                 </div>
@@ -466,10 +1007,37 @@ const Billing = () => {
                       <span className="font-medium">₦85,000 (20%)</span>
                     </div>
                   </div>
-                  <Button variant="outline" className="w-full gap-2 mt-4">
-                    <Download className="h-4 w-4" />
-                    Download Full Report
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        className="w-full gap-2 mt-4"
+                        disabled={isExporting}
+                      >
+                        {isExporting ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Download className="h-4 w-4" />
+                        )}
+                        {isExporting ? `Exporting ${exportFormat?.toUpperCase()}...` : "Download Full Report"}
+                        <ChevronDown className="h-4 w-4 ml-auto" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="center" className="w-[200px]">
+                      <DropdownMenuItem onClick={handleExportCSV} className="gap-2 cursor-pointer">
+                        <FileSpreadsheet className="h-4 w-4" />
+                        Export as CSV
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleExportExcel} className="gap-2 cursor-pointer">
+                        <FileSpreadsheet className="h-4 w-4 text-success" />
+                        Export as Excel
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleExportPDF} className="gap-2 cursor-pointer">
+                        <FileType className="h-4 w-4 text-destructive" />
+                        Export as PDF
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </CardContent>
               </Card>
             </div>

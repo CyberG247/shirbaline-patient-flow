@@ -3,6 +3,7 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -21,6 +22,13 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Pill,
   Search,
   Package,
@@ -30,10 +38,12 @@ import {
   TrendingDown,
   Plus,
   FileText,
+  Loader2,
 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 // Mock data
-const prescriptions = [
+const initialPrescriptions = [
   {
     id: "RX001",
     patientId: "SH-2024-0001",
@@ -74,7 +84,7 @@ const prescriptions = [
   },
 ];
 
-const inventory = [
+const initialInventory = [
   { id: 1, name: "Paracetamol 500mg", category: "Analgesic", stock: 500, minStock: 100, unit: "Tablets", price: 50, expiry: "2025-06-15" },
   { id: 2, name: "Amoxicillin 250mg", category: "Antibiotic", stock: 200, minStock: 50, unit: "Capsules", price: 100, expiry: "2024-12-20" },
   { id: 3, name: "Metformin 500mg", category: "Antidiabetic", stock: 45, minStock: 100, unit: "Tablets", price: 80, expiry: "2025-03-10" },
@@ -83,12 +93,117 @@ const inventory = [
   { id: 6, name: "Ciprofloxacin 500mg", category: "Antibiotic", stock: 15, minStock: 30, unit: "Tablets", price: 150, expiry: "2024-11-15" },
 ];
 
+const categories = ["Analgesic", "Antibiotic", "Antidiabetic", "Antacid", "Antihypertensive", "Antipyretic", "Other"];
+const units = ["Tablets", "Capsules", "Bottles", "Vials", "Ampoules", "Sachets"];
+
 const Pharmacy = () => {
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("prescriptions");
-  const [selectedPrescription, setSelectedPrescription] = useState<typeof prescriptions[0] | null>(null);
+  const [prescriptions, setPrescriptions] = useState(initialPrescriptions);
+  const [inventory, setInventory] = useState(initialInventory);
+  const [isAddDrugOpen, setIsAddDrugOpen] = useState(false);
+  const [isAddingDrug, setIsAddingDrug] = useState(false);
+  const [isDispensing, setIsDispensing] = useState<string | null>(null);
+  const [isRestocking, setIsRestocking] = useState<number | null>(null);
+
+  // Add Drug Form State
+  const [drugForm, setDrugForm] = useState({
+    name: "",
+    category: "",
+    stock: "",
+    minStock: "",
+    unit: "",
+    price: "",
+    expiry: "",
+  });
 
   const lowStockItems = inventory.filter(item => item.stock < item.minStock);
+
+  const resetDrugForm = () => {
+    setDrugForm({
+      name: "",
+      category: "",
+      stock: "",
+      minStock: "",
+      unit: "",
+      price: "",
+      expiry: "",
+    });
+  };
+
+  const handleAddDrug = async () => {
+    if (!drugForm.name || !drugForm.category || !drugForm.stock || !drugForm.price) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsAddingDrug(true);
+    
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    const newDrug = {
+      id: inventory.length + 1,
+      name: drugForm.name,
+      category: drugForm.category,
+      stock: parseInt(drugForm.stock),
+      minStock: parseInt(drugForm.minStock) || 50,
+      unit: drugForm.unit || "Tablets",
+      price: parseInt(drugForm.price),
+      expiry: drugForm.expiry || "2025-12-31",
+    };
+
+    setInventory([...inventory, newDrug]);
+    setIsAddingDrug(false);
+    setIsAddDrugOpen(false);
+    resetDrugForm();
+
+    toast({
+      title: "Drug Added Successfully",
+      description: `${newDrug.name} has been added to inventory.`,
+    });
+  };
+
+  const handleDispense = async (rxId: string) => {
+    setIsDispensing(rxId);
+    
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    setPrescriptions(prescriptions.map(rx => 
+      rx.id === rxId ? { ...rx, status: "dispensed" } : rx
+    ));
+    
+    setIsDispensing(null);
+
+    toast({
+      title: "Prescription Dispensed",
+      description: `Prescription ${rxId} has been dispensed and wallet debited.`,
+    });
+  };
+
+  const handleRestock = async (drugId: number) => {
+    setIsRestocking(drugId);
+    
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    setInventory(inventory.map(drug => 
+      drug.id === drugId ? { ...drug, stock: drug.stock + 100 } : drug
+    ));
+    
+    setIsRestocking(null);
+
+    toast({
+      title: "Stock Updated",
+      description: "100 units have been added to inventory.",
+    });
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -112,22 +227,132 @@ const Pharmacy = () => {
 
   return (
     <MainLayout>
-      <div className="space-y-6 animate-fade-in">
+      <div className="p-6 lg:p-8 space-y-6 animate-fade-in">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Pharmacy</h1>
-            <p className="text-muted-foreground">Manage prescriptions, inventory, and dispensing</p>
+            <h1 className="text-2xl lg:text-3xl font-bold text-foreground flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl gradient-primary flex items-center justify-center">
+                <Pill className="h-5 w-5 text-primary-foreground" />
+              </div>
+              Pharmacy
+            </h1>
+            <p className="text-muted-foreground mt-2">Manage prescriptions, inventory, and dispensing</p>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" className="gap-2">
               <FileText className="h-4 w-4" />
               Reports
             </Button>
-            <Button className="gap-2">
-              <Plus className="h-4 w-4" />
-              Add Drug
-            </Button>
+            <Dialog open={isAddDrugOpen} onOpenChange={setIsAddDrugOpen}>
+              <DialogTrigger asChild>
+                <Button variant="hero" className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  Add Drug
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Add New Drug</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2 sm:col-span-2">
+                      <Label htmlFor="drugName">Drug Name *</Label>
+                      <Input
+                        id="drugName"
+                        value={drugForm.name}
+                        onChange={(e) => setDrugForm({ ...drugForm, name: e.target.value })}
+                        placeholder="e.g., Paracetamol 500mg"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="category">Category *</Label>
+                      <Select value={drugForm.category} onValueChange={(value) => setDrugForm({ ...drugForm, category: value })}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categories.map(cat => (
+                            <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="unit">Unit Type</Label>
+                      <Select value={drugForm.unit} onValueChange={(value) => setDrugForm({ ...drugForm, unit: value })}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select unit" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {units.map(unit => (
+                            <SelectItem key={unit} value={unit}>{unit}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="stock">Initial Stock *</Label>
+                      <Input
+                        id="stock"
+                        type="number"
+                        value={drugForm.stock}
+                        onChange={(e) => setDrugForm({ ...drugForm, stock: e.target.value })}
+                        placeholder="e.g., 100"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="minStock">Minimum Stock Level</Label>
+                      <Input
+                        id="minStock"
+                        type="number"
+                        value={drugForm.minStock}
+                        onChange={(e) => setDrugForm({ ...drugForm, minStock: e.target.value })}
+                        placeholder="e.g., 50"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="price">Unit Price (₦) *</Label>
+                      <Input
+                        id="price"
+                        type="number"
+                        value={drugForm.price}
+                        onChange={(e) => setDrugForm({ ...drugForm, price: e.target.value })}
+                        placeholder="e.g., 100"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="expiry">Expiry Date</Label>
+                      <Input
+                        id="expiry"
+                        type="date"
+                        value={drugForm.expiry}
+                        onChange={(e) => setDrugForm({ ...drugForm, expiry: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <Button 
+                    className="w-full gap-2" 
+                    variant="hero"
+                    onClick={handleAddDrug}
+                    disabled={isAddingDrug}
+                  >
+                    {isAddingDrug ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Adding Drug...
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="h-4 w-4" />
+                        Add Drug to Inventory
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
 
@@ -156,7 +381,9 @@ const Pharmacy = () => {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Dispensed Today</p>
-                  <p className="text-2xl font-bold text-foreground">12</p>
+                  <p className="text-2xl font-bold text-foreground">
+                    {prescriptions.filter(p => p.status === "dispensed").length}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -262,11 +489,7 @@ const Pharmacy = () => {
                       <TableCell>
                         <Dialog>
                           <DialogTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setSelectedPrescription(rx)}
-                            >
+                            <Button variant="outline" size="sm">
                               {rx.status === "pending" ? "Dispense" : "View"}
                             </Button>
                           </DialogTrigger>
@@ -302,9 +525,22 @@ const Pharmacy = () => {
                                 <p className="text-lg font-bold text-primary">₦{rx.totalCost.toLocaleString()}</p>
                               </div>
                               {rx.status === "pending" && (
-                                <Button className="w-full gap-2">
-                                  <CheckCircle2 className="h-4 w-4" />
-                                  Dispense & Deduct from Wallet
+                                <Button 
+                                  className="w-full gap-2"
+                                  onClick={() => handleDispense(rx.id)}
+                                  disabled={isDispensing === rx.id}
+                                >
+                                  {isDispensing === rx.id ? (
+                                    <>
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                      Dispensing...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <CheckCircle2 className="h-4 w-4" />
+                                      Dispense & Deduct from Wallet
+                                    </>
+                                  )}
                                 </Button>
                               )}
                             </div>
@@ -354,7 +590,18 @@ const Pharmacy = () => {
                       <TableCell>₦{drug.price}</TableCell>
                       <TableCell>{drug.expiry}</TableCell>
                       <TableCell>
-                        <Button variant="outline" size="sm">Restock</Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleRestock(drug.id)}
+                          disabled={isRestocking === drug.id}
+                        >
+                          {isRestocking === drug.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            "Restock"
+                          )}
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
