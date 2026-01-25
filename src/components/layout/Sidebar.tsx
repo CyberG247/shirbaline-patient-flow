@@ -20,8 +20,17 @@ import {
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTenant } from "@/contexts/TenantContext";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 
-const navigation = [
+const coreNavigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Register Patient", href: "/register", icon: UserPlus },
   { name: "Find Patient", href: "/search", icon: Search },
@@ -33,6 +42,16 @@ const navigation = [
   { name: "Reports", href: "/reports", icon: BarChart3 },
 ];
 
+const adminNavigation = [
+  { name: "Hospital Admin", href: "/tenant-admin", icon: Building2 },
+  { name: "Subscription", href: "/subscription", icon: CreditCard },
+];
+
+const saasNavigation = [
+  { name: "SaaS Admin", href: "/saas-admin", icon: Activity },
+  { name: "Analytics", href: "/saas-analytics", icon: BarChart3 },
+];
+
 const secondaryNavigation = [
   { name: "Settings", href: "/settings", icon: Settings },
 ];
@@ -41,7 +60,10 @@ export function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { currentTenant, currentPlan, tenants, switchTenant } = useTenant();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const isSaasOwner = user?.role === "SaaSOwner";
+  const isHospitalAdmin = user?.role === "HospitalAdmin";
 
   const handleLogout = () => {
     logout();
@@ -83,8 +105,12 @@ export function Sidebar() {
               <Building2 className="h-6 w-6 text-sidebar-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-sidebar-foreground">SHIMS</h1>
-              <p className="text-xs text-sidebar-foreground/60">Shirbaline Hospital</p>
+              <h1 className="text-lg font-bold text-sidebar-foreground">
+                {currentTenant?.profile.shortName ?? "HMS"}
+              </h1>
+              <p className="text-xs text-sidebar-foreground/60">
+                {isSaasOwner ? "SaaS Control Center" : currentTenant?.profile.name ?? "Hospital"}
+              </p>
             </div>
           </div>
 
@@ -92,19 +118,60 @@ export function Sidebar() {
           <div className="px-6 py-4 border-b border-sidebar-border">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-full bg-sidebar-accent flex items-center justify-center">
-                <span className="text-sm font-semibold text-sidebar-foreground">IT</span>
+                <span className="text-sm font-semibold text-sidebar-foreground">
+                  {(user?.name ?? "User")
+                    .split(" ")
+                    .map((part) => part[0])
+                    .join("")
+                    .slice(0, 2)
+                    .toUpperCase()}
+                </span>
               </div>
               <div>
-                <p className="text-sm font-medium text-sidebar-foreground">IT Desk Officer</p>
-                <p className="text-xs text-sidebar-foreground/60">Reception</p>
+                <p className="text-sm font-medium text-sidebar-foreground">
+                  {user?.name ?? "Staff Member"}
+                </p>
+                <p className="text-xs text-sidebar-foreground/60">
+                  {user?.department ?? "Department"}
+                </p>
               </div>
             </div>
+            {currentPlan && !isSaasOwner && (
+              <div className="mt-3 flex items-center gap-2">
+                <Badge variant="secondary">{currentPlan.name}</Badge>
+                <span className="text-xs text-sidebar-foreground/60">
+                  {currentTenant?.subscriptionStatus ?? "active"}
+                </span>
+              </div>
+            )}
+            {isSaasOwner && (
+              <div className="mt-4 space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/40">
+                  Active Tenant
+                </p>
+                <Select
+                  value={currentTenant?.id}
+                  onValueChange={(value) => switchTenant(value)}
+                >
+                  <SelectTrigger className="h-9 bg-sidebar-accent text-sidebar-foreground">
+                    <SelectValue placeholder="Select tenant" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {tenants.map((tenant) => (
+                      <SelectItem key={tenant.id} value={tenant.id}>
+                        {tenant.profile.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
 
           {/* Navigation */}
           <nav className="flex-1 overflow-y-auto px-4 py-4">
             <div className="space-y-1">
-              {navigation.map((item) => {
+              {(isSaasOwner ? saasNavigation : coreNavigation).map((item) => {
                 const isActive = location.pathname === item.href;
                 return (
                   <Link
@@ -119,6 +186,30 @@ export function Sidebar() {
                 );
               })}
             </div>
+
+            {!isSaasOwner && isHospitalAdmin && (
+              <div className="mt-8">
+                <p className="px-4 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/40">
+                  Administration
+                </p>
+                <div className="mt-2 space-y-1">
+                  {adminNavigation.map((item) => {
+                    const isActive = location.pathname === item.href;
+                    return (
+                      <Link
+                        key={item.name}
+                        to={item.href}
+                        onClick={() => setIsMobileOpen(false)}
+                        className={cn("sidebar-link", isActive && "active")}
+                      >
+                        <item.icon className="h-5 w-5" />
+                        <span>{item.name}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             <div className="mt-8">
               <p className="px-4 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/40">

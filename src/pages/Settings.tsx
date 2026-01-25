@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -34,9 +34,11 @@ import {
   Loader2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useTenant } from "@/contexts/TenantContext";
 
 const Settings = () => {
   const { toast } = useToast();
+  const { currentTenant, updateTenantProfile } = useTenant();
   const [activeTab, setActiveTab] = useState("hospital");
   const [showPassword, setShowPassword] = useState(false);
   
@@ -50,15 +52,16 @@ const Settings = () => {
 
   // Hospital settings state
   const [hospitalSettings, setHospitalSettings] = useState({
-    name: "Shirbaline Hospital",
-    shortName: "SHIMS",
-    email: "info@shirbalinehospital.com",
-    phone: "+234 803 456 7890",
-    address: "Hospital Road, Dutse",
-    city: "Dutse",
-    state: "Jigawa",
-    country: "Nigeria",
-    website: "www.shirbalinehospital.com",
+    name: currentTenant?.profile.name ?? "Hospital",
+    shortName: currentTenant?.profile.shortName ?? "HMS",
+    email: currentTenant?.profile.email ?? "info@hospital.com",
+    phone: currentTenant?.profile.phone ?? "",
+    address: currentTenant?.profile.address ?? "",
+    city: currentTenant?.profile.city ?? "",
+    state: currentTenant?.profile.state ?? "",
+    country: currentTenant?.profile.country ?? "",
+    website: currentTenant?.profile.website ?? "",
+    brandColor: currentTenant?.profile.brandColor ?? "hsl(152, 69%, 31%)",
     registrationFee: "2000",
     minimumDeposit: "5000",
     workingHours: "24/7",
@@ -95,6 +98,21 @@ const Settings = () => {
     setIsSavingHospital(true);
     await new Promise(resolve => setTimeout(resolve, 1500));
     setIsSavingHospital(false);
+    if (currentTenant) {
+      updateTenantProfile(currentTenant.id, {
+        name: hospitalSettings.name,
+        shortName: hospitalSettings.shortName,
+        email: hospitalSettings.email,
+        phone: hospitalSettings.phone,
+        address: hospitalSettings.address,
+        city: hospitalSettings.city,
+        state: hospitalSettings.state,
+        country: hospitalSettings.country,
+        website: hospitalSettings.website,
+        brandColor: hospitalSettings.brandColor,
+        logoText: hospitalSettings.shortName.slice(0, 2).toUpperCase(),
+      });
+    }
     toast({
       title: "Settings Saved",
       description: "Hospital settings have been updated successfully.",
@@ -150,6 +168,23 @@ const Settings = () => {
       description: "All other sessions have been signed out.",
     });
   };
+
+  useEffect(() => {
+    if (!currentTenant) return;
+    setHospitalSettings((prev) => ({
+      ...prev,
+      name: currentTenant.profile.name,
+      shortName: currentTenant.profile.shortName,
+      email: currentTenant.profile.email,
+      phone: currentTenant.profile.phone,
+      address: currentTenant.profile.address,
+      city: currentTenant.profile.city,
+      state: currentTenant.profile.state,
+      country: currentTenant.profile.country,
+      website: currentTenant.profile.website,
+      brandColor: currentTenant.profile.brandColor,
+    }));
+  }, [currentTenant]);
 
   return (
     <MainLayout>
@@ -287,7 +322,7 @@ const Settings = () => {
                   </div>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-4 sm:grid-cols-3">
                   <div className="space-y-2">
                     <Label htmlFor="website" className="flex items-center gap-2">
                       <Globe className="h-4 w-4" /> Website
@@ -296,6 +331,18 @@ const Settings = () => {
                       id="website"
                       value={hospitalSettings.website}
                       onChange={(e) => setHospitalSettings({ ...hospitalSettings, website: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="brandColor" className="flex items-center gap-2">
+                      <Palette className="h-4 w-4" /> Brand Color
+                    </Label>
+                    <Input
+                      id="brandColor"
+                      type="color"
+                      value={hospitalSettings.brandColor}
+                      onChange={(e) => setHospitalSettings({ ...hospitalSettings, brandColor: e.target.value })}
+                      className="h-10 w-full p-1"
                     />
                   </div>
                   <div className="space-y-2">

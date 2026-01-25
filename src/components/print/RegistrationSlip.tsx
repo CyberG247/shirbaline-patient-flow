@@ -122,7 +122,7 @@ const RegistrationSlip = forwardRef<HTMLDivElement, RegistrationSlipProps>(
         {/* Footer */}
         <div className="border-t pt-4 text-center">
           <p className="text-xs text-gray-500 mb-2">
-            Thank you for registering with Shirbaline Hospital
+            Thank you for registering with FirstGrade Hospital Management System
           </p>
           <p className="text-[10px] text-gray-400">
             Please keep this receipt and your Patient ID for future visits. Present your ID at the reception desk.

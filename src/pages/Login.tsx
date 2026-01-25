@@ -1,11 +1,19 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { useTenant } from "@/contexts/TenantContext";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Building2,
   Mail,
@@ -72,6 +80,7 @@ const Login = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
   const { toast } = useToast();
+  const { tenants, switchTenant } = useTenant();
   
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -79,6 +88,9 @@ const Login = () => {
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [accountType, setAccountType] = useState<"hospital" | "saas">("hospital");
+  const [selectedTenantId, setSelectedTenantId] = useState(tenants[0]?.id ?? "");
+  const [role, setRole] = useState<"Staff" | "HospitalAdmin">("Staff");
 
   const validateForm = () => {
     const newErrors: { email?: string; password?: string } = {};
@@ -106,14 +118,23 @@ const Login = () => {
     
     setIsLoading(true);
     
-    const success = await login(email, password);
+    if (accountType === "hospital" && selectedTenantId) {
+      switchTenant(selectedTenantId);
+    }
+
+    const success = await login(email, password, {
+      tenantId: accountType === "hospital" ? selectedTenantId : null,
+      role: accountType === "saas" ? "SaaSOwner" : role,
+      name: accountType === "saas" ? "SaaS Owner" : "Hospital User",
+      department: accountType === "saas" ? "SaaS Operations" : "Hospital Operations",
+    });
     
     if (success) {
       toast({
         title: "Welcome back!",
         description: "You have successfully logged in.",
       });
-      navigate("/");
+      navigate(accountType === "saas" ? "/saas-admin" : "/");
     } else {
       toast({
         title: "Login Failed",
@@ -139,14 +160,13 @@ const Login = () => {
             </div>
             <div>
               <h2 className="text-2xl font-bold">SHIMS</h2>
-              <p className="text-white/70 text-sm">Shirbaline Hospital</p>
+              <p className="text-white/70 text-sm">FirstGrade Hospital Management System</p>
             </div>
           </div>
           
           <h1 className="text-4xl xl:text-5xl font-bold leading-tight mb-6">
             Welcome to<br />
-            <span className="text-[#86efac]">Shirbaline Hospital</span><br />
-            Management System
+            <span className="text-[#86efac]">FirstGrade Hospital Management System</span>
           </h1>
           
           <p className="text-lg text-white/80 max-w-md leading-relaxed">
@@ -182,18 +202,62 @@ const Login = () => {
             </div>
             <div>
               <h2 className="text-xl font-bold">SHIMS</h2>
-              <p className="text-muted-foreground text-xs">Shirbaline Hospital</p>
+              <p className="text-muted-foreground text-xs">FirstGrade Hospital Management System</p>
             </div>
           </div>
           
           <div className="text-center lg:text-left mb-8">
-            <h2 className="text-2xl font-bold text-foreground">Staff Login</h2>
+            <h2 className="text-2xl font-bold text-foreground">Sign In</h2>
             <p className="text-muted-foreground mt-2">
-              Enter your credentials to access the system
+              Select account type and enter your credentials
             </p>
           </div>
           
           <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="space-y-2">
+              <Label>Account Type</Label>
+              <Select value={accountType} onValueChange={(value) => setAccountType(value as "hospital" | "saas")}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select account type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="hospital">Hospital Staff</SelectItem>
+                  <SelectItem value="saas">SaaS Owner</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {accountType === "hospital" && (
+              <>
+                <div className="space-y-2">
+                  <Label>Hospital</Label>
+                  <Select value={selectedTenantId} onValueChange={setSelectedTenantId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select hospital" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {tenants.map((tenant) => (
+                        <SelectItem key={tenant.id} value={tenant.id}>
+                          {tenant.profile.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Role</Label>
+                  <Select value={role} onValueChange={(value) => setRole(value as "Staff" | "HospitalAdmin")}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Staff">Staff</SelectItem>
+                      <SelectItem value="HospitalAdmin">Hospital Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
             <div className="space-y-2">
               <Label htmlFor="email">Email Address</Label>
               <div className="relative">
@@ -201,7 +265,7 @@ const Login = () => {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="you@shirbaline.com"
+                  placeholder="you@hospital.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className={`pl-10 ${errors.email ? 'border-destructive' : ''}`}
@@ -284,13 +348,25 @@ const Login = () => {
           </form>
           
           <div className="mt-8 text-center text-sm text-muted-foreground">
-            <p>
-              Demo credentials: <span className="font-medium text-foreground">any email & password</span>
-            </p>
+            <div className="space-y-1">
+              <p>
+                Demo credentials: <span className="font-medium text-foreground">any email & password</span>
+              </p>
+              <p>
+                New hospital?{" "}
+                <Link to="/signup" className="text-primary font-medium hover:underline">
+                  Create an account
+                </Link>
+                {" · "}
+                <Link to="/saas" className="text-primary font-medium hover:underline">
+                  View plans
+                </Link>
+              </p>
+            </div>
           </div>
           
           <p className="mt-8 text-center text-xs text-muted-foreground">
-            © {new Date().getFullYear()} Shirbaline Hospital. All rights reserved.
+            © {new Date().getFullYear()} FirstGrade Hospital Management System. All rights reserved.
           </p>
         </div>
       </div>

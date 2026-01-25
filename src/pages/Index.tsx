@@ -11,8 +11,11 @@ import {
   AlertCircle,
   Clock,
 } from "lucide-react";
+import { useTenant } from "@/contexts/TenantContext";
+import { Badge } from "@/components/ui/badge";
 
 const Index = () => {
+  const { currentTenant, currentPlan } = useTenant();
   // Get current date
   const today = new Date();
   const formattedDate = today.toLocaleDateString("en-NG", {
@@ -32,11 +35,19 @@ const Index = () => {
             <span>{formattedDate}</span>
           </div>
           <h1 className="text-2xl lg:text-3xl font-bold text-foreground">
-            Welcome to Reception Dashboard
+            Welcome to {currentTenant?.profile.name ?? "Hospital"} Reception Dashboard
           </h1>
           <p className="text-muted-foreground">
-            Shirbaline Hospital Internal Management System
+            {currentTenant?.profile.name ?? "Hospital"} Internal Management System
           </p>
+          {currentPlan && (
+            <div className="mt-2 flex items-center gap-2">
+              <Badge variant="secondary">{currentPlan.name}</Badge>
+              <span className="text-xs text-muted-foreground">
+                Subscription: {currentTenant?.subscriptionStatus ?? "active"}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Alert Banner */}

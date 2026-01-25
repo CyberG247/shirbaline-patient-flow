@@ -1,43 +1,46 @@
 import { createContext, useContext, useState, ReactNode, useEffect } from "react";
 
+type UserRole = "Staff" | "HospitalAdmin" | "SaaSOwner";
+
 interface User {
   id: string;
   name: string;
   email: string;
-  role: string;
+  role: UserRole;
   department: string;
+  tenantId: string | null;
+}
+
+interface LoginOptions {
+  tenantId?: string | null;
+  role?: UserRole;
+  name?: string;
+  department?: string;
 }
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string, options?: LoginOptions) => Promise<boolean>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock user for demo
-const MOCK_USER: User = {
+const DEFAULT_USER: User = {
   id: "USR-001",
   name: "IT Desk Officer",
   email: "it.desk@shirbaline.com",
-  role: "Admin",
+  role: "Staff",
   department: "Reception",
-};
-
-// Mock credentials for demo
-const MOCK_CREDENTIALS = {
-  email: "admin@shirbaline.com",
-  password: "admin123",
+  tenantId: "TEN-001",
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Check for existing session on mount
   useEffect(() => {
     const storedUser = localStorage.getItem("shirbaline_user");
     if (storedUser) {
@@ -46,15 +49,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(false);
   }, []);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Mock authentication - accept any non-empty credentials or the mock ones
+  const login = async (email: string, password: string, options?: LoginOptions): Promise<boolean> => {
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+
     if (email && password) {
-      const loggedInUser = {
-        ...MOCK_USER,
-        email: email,
+      const role = options?.role ?? "Staff";
+      const loggedInUser: User = {
+        id: `USR-${Date.now()}`,
+        name: options?.name ?? DEFAULT_USER.name,
+        email,
+        role,
+        department: options?.department ?? DEFAULT_USER.department,
+        tenantId: role === "SaaSOwner" ? null : options?.tenantId ?? DEFAULT_USER.tenantId,
       };
       setUser(loggedInUser);
       localStorage.setItem("shirbaline_user", JSON.stringify(loggedInUser));

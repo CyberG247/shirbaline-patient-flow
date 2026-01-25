@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { TenantProvider, useTenant } from "@/contexts/TenantContext";
 import Index from "./pages/Index";
 import RegisterPatient from "./pages/RegisterPatient";
 import SearchPatient from "./pages/SearchPatient";
@@ -17,10 +18,16 @@ import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
+import SaasLanding from "./pages/SaasLanding";
+import Signup from "./pages/Signup";
+import Subscribe from "./pages/Subscribe";
+import SaasAdminDashboard from "./pages/SaasAdminDashboard";
+import TenantAdminDashboard from "./pages/TenantAdminDashboard";
+import Subscription from "./pages/Subscription";
+import SaasAnalytics from "./pages/SaasAnalytics";
 
 const queryClient = new QueryClient();
 
-// Protected Route wrapper
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
 
@@ -42,7 +49,6 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// Public Route (for login - redirects to home if already logged in)
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
 
@@ -64,20 +70,58 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function RoleRoute({
+  children,
+  allowedRoles,
+}: {
+  children: React.ReactNode;
+  allowedRoles: string[];
+}) {
+  const { user } = useAuth();
+  if (!user || !allowedRoles.includes(user.role)) {
+    return <Navigate to="/" replace />;
+  }
+  return <>{children}</>;
+}
+
+function FeatureRoute({ children, feature }: { children: React.ReactNode; feature: string }) {
+  const { isFeatureEnabled } = useTenant();
+  if (!isFeatureEnabled(feature)) {
+    return <Navigate to="/subscription" replace />;
+  }
+  return <>{children}</>;
+}
+
+function HomeRoute() {
+  const { user } = useAuth();
+  if (user?.role === "SaaSOwner") {
+    return <Navigate to="/saas-admin" replace />;
+  }
+  return <Index />;
+}
+
 const AppRoutes = () => (
   <Routes>
-    {/* Public route - Login */}
-    <Route 
-      path="/login" 
+    <Route
+      path="/login"
       element={
         <PublicRoute>
           <Login />
         </PublicRoute>
-      } 
+      }
     />
-    
-    {/* Protected routes */}
-    <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+    <Route path="/saas" element={<SaasLanding />} />
+    <Route path="/pricing" element={<SaasLanding />} />
+    <Route path="/signup" element={<Signup />} />
+
+    <Route
+      path="/"
+      element={
+        <ProtectedRoute>
+          <HomeRoute />
+        </ProtectedRoute>
+      }
+    />
     <Route path="/register" element={<ProtectedRoute><RegisterPatient /></ProtectedRoute>} />
     <Route path="/search" element={<ProtectedRoute><SearchPatient /></ProtectedRoute>} />
     <Route path="/patient/:patientId" element={<ProtectedRoute><PatientDashboard /></ProtectedRoute>} />
@@ -85,11 +129,78 @@ const AppRoutes = () => (
     <Route path="/appointments" element={<ProtectedRoute><Appointments /></ProtectedRoute>} />
     <Route path="/laboratory" element={<ProtectedRoute><Laboratory /></ProtectedRoute>} />
     <Route path="/pharmacy" element={<ProtectedRoute><Pharmacy /></ProtectedRoute>} />
-    <Route path="/billing" element={<ProtectedRoute><Billing /></ProtectedRoute>} />
-    <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+    <Route
+      path="/billing"
+      element={
+        <ProtectedRoute>
+          <FeatureRoute feature="wallet">
+            <Billing />
+          </FeatureRoute>
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/reports"
+      element={
+        <ProtectedRoute>
+          <FeatureRoute feature="reports">
+            <Reports />
+          </FeatureRoute>
+        </ProtectedRoute>
+      }
+    />
     <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-    
-    {/* Catch-all */}
+    <Route
+      path="/subscribe"
+      element={
+        <ProtectedRoute>
+          <RoleRoute allowedRoles={["HospitalAdmin"]}>
+            <Subscribe />
+          </RoleRoute>
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/subscription"
+      element={
+        <ProtectedRoute>
+          <RoleRoute allowedRoles={["HospitalAdmin"]}>
+            <Subscription />
+          </RoleRoute>
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/saas-admin"
+      element={
+        <ProtectedRoute>
+          <RoleRoute allowedRoles={["SaaSOwner"]}>
+            <SaasAdminDashboard />
+          </RoleRoute>
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/saas-analytics"
+      element={
+        <ProtectedRoute>
+          <RoleRoute allowedRoles={["SaaSOwner"]}>
+            <SaasAnalytics />
+          </RoleRoute>
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/tenant-admin"
+      element={
+        <ProtectedRoute>
+          <RoleRoute allowedRoles={["HospitalAdmin"]}>
+            <TenantAdminDashboard />
+          </RoleRoute>
+        </ProtectedRoute>
+      }
+    />
+
     <Route path="*" element={<NotFound />} />
   </Routes>
 );
@@ -100,9 +211,11 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <AuthProvider>
-          <AppRoutes />
-        </AuthProvider>
+        <TenantProvider>
+          <AuthProvider>
+            <AppRoutes />
+          </AuthProvider>
+        </TenantProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
